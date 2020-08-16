@@ -1,0 +1,253 @@
+---
+title: "Machine Learning Course Project"
+author: "Anvil"
+date: "15/08/2020"
+output: html_document 
+keep_md : yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = F, warning = F)
+```
+
+
+# Summary
+
+
+# Loading the data and packages
+
+```{r}
+if (!file.exists("data")) {
+   dir.create("data")
+}
+trainUrlFile <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+trainfilename <- "./data/pml-training.csv"
+
+testUrlFile <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+testfilename <- "./data/pml-testing.csv"
+
+if (!file.exists(trainfilename)) {
+   download.file(trainUrlFile, trainfilename, method = "curl")
+}
+
+if (!file.exists(testfilename)) {
+   download.file(testUrlFile, testfilename, method = "curl")
+}
+
+pml_training <- read.csv(trainfilename)
+pml_testing <- read.csv(testfilename)
+
+library(ggplot2) ; library(caret) ; library(randomForest) ; library(gbm) 
+library(MASS) ; library(nnet)
+```
+
+# Data sclicing
+
+Before doing any exploratory data analysis, we will split the training data into a sub-train and a sub-test dataset :
+
+```{r}
+set.seed(1234)
+intrain <- createDataPartition(y = pml_training$classe, p = 0.8, list = F)
+subtrain <- pml_training[intrain, ]
+subtest <- pml_training[-intrain, ]
+
+```
+
+# Exploratory data analysis
+
+We'll start with a quick histogram showing, for each subject, how well they globally performed :
+
+```{r}
+qplot(x = factor(classe), data = subtrain, geom = "bar", fill = classe) + facet_wrap(user_name~ .)
+```
+
+Adelmo, Eurico and Jeremy tend to do the exercise correctly (class A) more frequently than others. It is paramount to remove the identifying parameters during the pre-processing phase or they might be taken as significant variables in our model fit.
+
+## NAs
+
+We'll do a quick check on the NA values of the training set.
+
+Let's check the dimensions of the subtrain set :
+
+```{r}
+dim(subtrain)
+```
+We have a total of `r dim(subtrain)[1] * dim(subtrain)[2]` cells.
+
+How many of those are NAs ?
+
+```{r}
+sum(is.na(subtrain))
+```
+
+Which means that `r round(100 * sum(is.na(subtrain)) / (dim(subtrain)[1] * dim(subtrain)[2]), 2)`% of the cells are NA
+
+We will need to do some pre-processing since we can't just ignore nearly half of the data.
+
+## Variable classes
+
+In the dataset, we have numeric, integers and a majority of character variables.
+
+However, some of the character variables should instead be numeric or factor. Let's see that.
+
+Let's first check the names of all the numeric variables :
+
+```{r}
+charcols <- numeric()
+for (i in 1:ncol(subtrain)){
+   if (class(subtrain[, i]) == "character"){
+      charcols <- c(charcols, i)
+   }
+}
+
+names(subtrain)[charcols]
+```
+
+- user_name is an ID variable that will be removed
+- cvd_timestamp should be a date time variable. However, our outcome is dependant on the gyroscopic and accelerometric results, not on the time they were measured. We can therefore consider this variable as an ID variable to remove
+- classe is our outcome. It should be a factor variable
+- new_window should be a factor variable, but is an ID variable that will be removed
+- The rest are measurements that should be numeric instead
+
+Here's the subset of variables that need to be converted to numeric :
+
+```{r}
+tonumconv <- charcols[-c(1,2,3,37)]
+```
+
+
+As for the other variables :
+
+```{r}
+names(subtrain)[-charcols]
+```
+
+- X and raw_timestamp are ID variables that will be removed
+- num_window is also an ID variable. It is also an indicator that can completely break this exam. If, for instance, an observation with num_window leads to an "A" measurement of "classe" on the train set, it will lead to an "A" class for any other observation with the same num_window value, whether it is in the train or test set.
+
+The subset of ID variable is :
+
+```{r}
+idvars <- c(1:7)
+```
+
+
+## A quick look to the variables to convert to numeric
+
+The several variables that we need to convert to numeric contain a lot of NAs. KNN-Impute algorithms require at least 50% of actual values. If that requirement is not met, we will simply remove these variables from the dataset.
+
+```{r}
+propna <- numeric()
+for (elt in tonumconv){
+   k <- sum(is.na(as.numeric(subtrain[, elt])))/nrow(subtrain)
+   propna <- c(propna, k)
+}
+
+quantile(propna)
+```
+
+As we can see, all these variables have at least 98% of missing values. We can't use them in any sort of model, so we will delete them during pre-processing
+
+# Pre-Processing
+
+The pre-process will consist in :
+
+1. Transforming the "classe" outcome in a factor variable
+2. Removing the ID variables
+3. Removing the variables with lots of NAs, as identified in our "tonumconv" vector
+4. For the remaining numeric variables, removing those that have more than 50% NAs
+
+We combine all these steps into :
+
+- One function to use on the sub-train frame, that returns a list of variables to remove
+- One fuction to use on every data frame, that converts "classe" to factor and uses the above-mentionned list to subset the frame
+
+
+```{r}
+preprocsubset <- function(df){
+   
+   perc_NA <- numeric()
+   
+   for (i in 1:ncol(df)){
+      if (i == ncol(df)){
+         p <- 0
+      } else {
+         p <- sum(is.na(as.numeric(df[, i])))/nrow(df)
+      }
+      
+      perc_NA <- c(perc_NA, p)
+   }
+   
+   toremove <- which(perc_NA > 0.5)
+   toremoveall <- unique(c(toremove, idvars, tonumconv))
+   
+   return(toremoveall)
+}
+
+preprocesser <- function(df, subsetter){
+   
+   df[, 160] <- factor(df[, 160])
+   
+   
+   
+   df <- df[, -subsetter]
+   
+   return(df)
+}
+```
+
+We use that preprocess on subtrain :
+
+```{r}
+ss <- preprocsubset(subtrain)
+subtrain <- preprocesser(subtrain, ss)
+```
+
+Now we can build our model
+
+# Model Building
+
+For this study, we will build a random forest algorithm.
+
+To speed things up, we call the parallel and doParallel packages to do parallel processing.
+
+```{r, eval=F}
+library(parallel)
+library(doParallel)
+cluster1 <- makeCluster(detectCores() - 1)
+registerDoParallel(cluster1)
+
+
+set.seed(1234)
+modfitrf1 <- randomForest(classe ~ ., data = subtrain)
+
+
+stopCluster(cluster1)
+registerDoSEQ()
+```
+
+```{r, echo = F}
+load("./data/modfitrf1.RData")
+
+```
+
+Let's check the accuracy of the model on our sub-test set.
+
+We'll first need to preprocess it :
+
+```{r}
+subtest <- preprocesser(subtest, ss)
+```
+
+And now we predict the values :
+
+```{r}
+predrf <- predict(modfitrf1, subtest)
+
+confusionMatrix(predrf, subtest$classe)$overall["Accuracy"]
+
+```
+
+We have a very accurate model.
+
+We can now use it for the quiz.
