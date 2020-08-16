@@ -371,6 +371,9 @@ summary {
 
 <div id="summary" class="section level1">
 <h1>Summary</h1>
+<p>In this project, six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E). Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes.</p>
+<p>We aim to use train data to build a reliable model to predict whether the exercize was properly made or not.</p>
+<p>The original data can be found here : <a href="http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har" class="uri">http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har</a></p>
 </div>
 <div id="loading-the-data-and-packages" class="section level1">
 <h1>Loading the data and packages</h1>
@@ -626,6 +629,7 @@ confusionMatrix(predrf, subtest$classe)$overall[&quot;Accuracy&quot;]</code></pr
 <pre><code>##  Accuracy 
 ## 0.9936273</code></pre>
 <p>We have a very accurate model.</p>
+<p>At first, the goal was to build 4 models (a random forest, a GBM, an LDA and a multinomial GLM) and use majority votes to create a final model with high accuracy. However, the accuracy of our random forest model is so high that we do not need the others and we will stop the model building here.</p>
 <p>We can now use it for the quiz.</p>
 </div>
 

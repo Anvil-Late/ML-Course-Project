@@ -1,6 +1,21 @@
 Summary
 =======
 
+In this project, six young health participants were asked to perform one
+set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five
+different fashions: exactly according to the specification (Class A),
+throwing the elbows to the front (Class B), lifting the dumbbell only
+halfway (Class C), lowering the dumbbell only halfway (Class D) and
+throwing the hips to the front (Class E). Class A corresponds to the
+specified execution of the exercise, while the other 4 classes
+correspond to common mistakes.
+
+We aim to use train data to build a reliable model to predict whether
+the exercize was properly made or not.
+
+The original data can be found here :
+<a href="http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har" class="uri">http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har</a>
+
 Loading the data and packages
 =============================
 
@@ -328,5 +343,11 @@ And now we predict the values :
     ## 0.9936273
 
 We have a very accurate model.
+
+At first, the goal was to build 4 models (a random forest, a GBM, an LDA
+and a multinomial GLM) and use majority votes to create a final model
+with high accuracy. However, the accuracy of our random forest model is
+so high that we do not need the others and we will stop the model
+building here.
 
 We can now use it for the quiz.
