@@ -20,7 +20,7 @@ correspond to common mistakes.
 We aim to use train data to build a reliable model to predict whether
 the exercise was properly made or not, which means that we want to be
 able to predict the class (A to E) according to the measurements given
-by the devices
+by the devices.
 
 The original data can be found
 [here](http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har)
