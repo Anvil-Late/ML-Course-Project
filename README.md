@@ -99,8 +99,9 @@ How many of those are NAs ?
 
 Which means that 41.05% of the cells are NA
 
-We will need to do some pre-processing since we can’t just ignore nearly
-half of the data.
+We will see if we can do some pre-processing since we can’t just ignore 
+nearly half of the data without first checking if we can do something
+about it.
 
 Variable classes
 ----------------
